@@ -1,0 +1,153 @@
+{
+  "_comment": "Reference values for PGMN patch 20. Accuracy is copied from the production evaluation; uncertainty is recomputed on this patch alone with the production definitions. Every entry is a median across scored cells; *_iqr is [p25, p75].",
+  "model": "PGMN",
+  "patch_idx": 20,
+  "grid": "EASE-Grid 2.0 Global M36 (36 km equal-area), 406 x 964",
+  "row_range": [
+    49,
+    112
+  ],
+  "col_range": [
+    193,
+    256
+  ],
+  "lat_range": [
+    26.7852,
+    49.4338
+  ],
+  "lon_range": [
+    -108.112,
+    -84.5851
+  ],
+  "calibration_period": {
+    "steps": 2830,
+    "train_steps": 2255,
+    "valid_steps": 557,
+    "note": "train fits weights; valid drives early stopping only"
+  },
+  "evaluation_period": {
+    "block_days": 1004,
+    "warmup_days": 9,
+    "scored_days": 995,
+    "start": "2023-01-10",
+    "end": "2025-09-30",
+    "note": "the first seq_len-1 steps of the block are ConvLSTM warm-up and are not scored"
+  },
+  "convention": "grid-wise median across scored cells; a cell is scored if it has at least 10 paired observations in the evaluation window",
+  "n_grid": 2536,
+  "accuracy": {
+    "wbm_baseline": {
+      "KGE": 0.282632,
+      "KGE_iqr": [
+        0.166405,
+        0.395092
+      ],
+      "RMSE": 0.072898,
+      "RMSE_iqr": [
+        0.05295,
+        0.088266
+      ],
+      "R": 0.344119,
+      "R_iqr": [
+        0.237056,
+        0.456858
+      ],
+      "Bias": -0.004628,
+      "Bias_iqr": [
+        -0.016846,
+        0.014508
+      ]
+    },
+    "pgmn_reconstruction": {
+      "KGE": 0.634546,
+      "KGE_iqr": [
+        0.557153,
+        0.703836
+      ],
+      "RMSE": 0.046242,
+      "RMSE_iqr": [
+        0.037309,
+        0.054533
+      ],
+      "R": 0.683288,
+      "R_iqr": [
+        0.617782,
+        0.74751
+      ],
+      "Bias": 0.001669,
+      "Bias_iqr": [
+        -0.006668,
+        0.013222
+      ]
+    }
+  },
+  "uncertainty": {
+    "PICP95": 0.94321,
+    "PICP95_iqr": [
+      0.913562,
+      0.961104
+    ],
+    "q": 1.066702,
+    "q_iqr": [
+      0.958422,
+      1.194894
+    ],
+    "MPIW": 0.167812,
+    "MPIW_iqr": [
+      0.125828,
+      0.20292
+    ],
+    "MAE": 0.034903,
+    "MAE_iqr": [
+      0.027071,
+      0.042804
+    ],
+    "CRPS": 0.025178,
+    "CRPS_iqr": [
+      0.019441,
+      0.030272
+    ],
+    "MA": 0.043737,
+    "MA_iqr": [
+      0.024059,
+      0.073775
+    ],
+    "SB": -0.000172,
+    "SB_iqr": [
+      -0.047808,
+      0.03812
+    ],
+    "CRPS_reduction_pct": 28.350795,
+    "CRPS_reduction_pct_iqr": [
+      27.276034,
+      29.348057
+    ]
+  },
+  "model_selection": {
+    "M": 2,
+    "num_params_k": 119862,
+    "AIC": 4.09171539E+6,
+    "NLL_calibration": 0.969862,
+    "n_calibration": 1.985845E+6,
+    "NLL_valid": 1.072399,
+    "n_valid": 462095,
+    "NLL_evaluation": 1.14255,
+    "n_evaluation": 995175,
+    "note": "AIC = 2k + 2*NLL_calibration*n_calibration; k counts Weights and Bias only"
+  },
+  "tolerance": {
+    "KGE": 0.001,
+    "RMSE": 0.0001,
+    "R": 0.001,
+    "Bias": 0.0001,
+    "PICP95": 0.005,
+    "q": 0.001,
+    "MPIW": 0.0001,
+    "MAE": 0.0001,
+    "CRPS": 0.0001,
+    "MA": 0.005,
+    "SB": 0.005,
+    "CRPS_reduction_pct": 0.1,
+    "_comment": "Absolute tolerance per metric. Measured spread: 7.6e-6 against production on GPU, at most 1.9e-5 between a GPU and a CPU run of this package. Most bounds are 50-100x that, to absorb a different BLAS or an absent GPU. PICP95, MA and SB get 5e-3 because they are counting statistics: one comparison e <= z*sigma flipping in a cell with 200 observations moves that cell by 1/200, so they are quantized in a way the continuous metrics are not."
+  }
+}

@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use PGMN in academic work, please cite the accompanying paper."
+title: "PGMN: Physics-Guided Mixture Density Network for SMAP soil moisture reconstruction"
+abstract: >
+  Reproducible MATLAB pipeline that pairs a Water Balance Model (WBM)
+  baseline with a mixture-density ConvLSTM residual learner to reconstruct
+  daily SMAP surface soil moisture on the EASE-Grid 2.0 Global M36 grid
+  (36 km, equal-area). The network predicts the distribution of the WBM
+  residual rather than soil moisture directly, so the reconstruction
+  inherits the water balance and carries a predictive uncertainty.
+  This repository ships one 64x64 patch over the central United States
+  together with the trained model, so that the evaluation-period accuracy
+  and calibration numbers reported in the paper can be reproduced from
+  MATLAB in under a minute.
+authors:
+  - family-names: "Hong"
+    given-names: "Hae-Chan"
+    email: "hchm5465@gmail.com"
+version: "0.2.0"
+date-released: "2026-08-29"
+license: MIT
+keywords:
+  - soil moisture
+  - SMAP
+  - water balance model
+  - mixture density network
+  - ConvLSTM
+  - physics-guided machine learning
+  - predictive uncertainty
+  - reproducibility
