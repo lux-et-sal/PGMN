@@ -24,6 +24,7 @@ contact:
     given-names: "Seokhyeon"
     affiliation: "Kyung Hee University"
     email: "shynkim@khu.ac.kr"
+    website: "https://github.com/steelpl"
 version: "0.2.0"
 date-released: "2026-09-08"
 license: MIT
