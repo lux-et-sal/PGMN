@@ -7,19 +7,17 @@ surface soil moisture on the EASE-Grid 2.0 Global M36 grid (36 km, equal-area).
 The network does not predict soil moisture. It predicts the **distribution of
 the WBM residual**, and the reconstruction is
 
-```
-theta_PGMN(t) = theta_WBM(t) - r_hat(t)
-```
+$$\theta^{\mathrm{rec}}_t=\theta^{\mathrm{WBM}}_t-\hat{\varepsilon}_t$$
 
 so the result inherits the water balance and arrives with a predictive spread
-rather than a bare number. This repository ships **one 64×64 patch over the
+rather than a bare number (§2). This repository ships **one 64×64 patch over the
 central United States** and the **trained model for that patch**, so the
 evaluation-period accuracy *and* the calibration diagnostics reported in the
 paper can be reproduced end-to-end in under a minute.
 
 > Scope: this is the inference and verification path only. Training the full
 > 83-patch global domain, and running the water balance model, are not part of
-> this repository. See §2 for what that means in practice.
+> this repository. See §3 for what that means in practice.
 
 ---
 
@@ -44,7 +42,121 @@ quantities matched the reference within tolerance.
 
 ---
 
-## 2. What the pipeline does
+## 2. Method
+
+PGMN separates the reconstruction into a physical baseline and a learned
+correction. The equations below use the notation of the paper (Section 2);
+the last column of the table says where each one lives in this repository.
+
+### 2.1 Water balance baseline
+
+Surface soil moisture $\theta$ (m³ m⁻³) in a cell is advanced one day at a
+time from precipitation $P$ (mm day⁻¹) alone:
+
+$$
+\theta^{\mathrm{WBM}}_{t+1}=\theta^{\mathrm{WBM}}_{t}
++\Delta t\left(\frac{P_{t}}{\Delta Z}-L\!\left(\theta^{\mathrm{WBM}}_{t}\right)\right)
+$$
+
+where $\Delta Z$ (mm) is the effective depth and $L(\theta)$ (day⁻¹) is a
+loss rate. $L$ is piecewise: a linear ramp from the lower limit to $p_1$, a
+quantile regression on the observed dry-down limbs between $p_1$ and $p_2$
+(quantile $\beta$), and a linear extrapolation of slope $\alpha$ from $p_2$
+up to the porosity $\phi$, which bounds the state from above. The three
+parameters $(\alpha,\ \Delta Z,\ \beta)$ are fitted once per cell on the
+calibration period only. After calibration the model runs **open loop**: it
+never reads a SMAP retrieval again, so the baseline is complete in time by
+construction and carries no observational noise. The run starts at the first
+valid retrieval of each cell and is back-filled over the days before it.
+
+### 2.2 Residual and reconstruction
+
+The learner never predicts soil moisture. It predicts the baseline error,
+
+$$
+\varepsilon_t=\theta^{\mathrm{WBM}}_t-\theta^{\mathrm{SMAP}}_t ,
+$$
+
+and the reconstruction subtracts the predicted residual from the baseline:
+
+$$
+\theta^{\mathrm{rec}}_t=\theta^{\mathrm{WBM}}_t-\hat{\varepsilon}_t .
+$$
+
+Where the correction would drive $\theta^{\mathrm{rec}}_t$ to zero or below,
+the baseline value is kept instead (0.04 % of the cell-days in the paper).
+
+The input at day $t$ is a four-channel field over the 64 × 64 patch,
+
+$$
+X_t=\left[\,P_t,\ \theta^{\mathrm{WBM}}_t,\ \varepsilon_{t-1},\ a_{t-1}\,\right],
+$$
+
+with $a_{t-1}\in\{0,1\}$ flagging whether a retrieval existed on the previous
+day. When it did not, $\varepsilon_{t-1}$ is masked to zero on the normalized
+scale (the calibration mean) and $a_{t-1}=0$. The rule is the same in
+training and inference, so a gap of any length is handled by the same
+forward pass: the residual channel stays masked and the model works from
+precipitation, the baseline and the flag alone. The network reads a window
+of the last ten days, which is why the first nine days of the evaluation
+block are warm-up and not scored.
+
+### 2.3 Mixture density head
+
+Residuals are heteroscedastic and not Gaussian, so the network outputs a
+distribution rather than a value. A convolutional encoder, a ConvLSTM core
+and a transposed-convolution decoder end in a $3M$-channel head that
+parameterizes a Gaussian mixture at every cell:
+
+$$
+p\!\left(\varepsilon_t\mid X_t\right)=\sum_{m=1}^{M} w_{m,t}\,
+\mathcal N\!\left(\varepsilon_t\mid \mu_{m,t},\ \sigma_{m,t}^{2}\right),
+\qquad \sum_m w_{m,t}=1 .
+$$
+
+The point prediction is the conditional expectation, and the predictive
+spread follows from the law of total variance:
+
+$$
+\hat{\varepsilon}_t=\sum_{m} w_{m,t}\,\mu_{m,t},
+\qquad
+\sigma_t^{2}=\sum_{m} w_{m,t}\left[\sigma_{m,t}^{2}+\left(\mu_{m,t}-\hat{\varepsilon}_t\right)^{2}\right].
+$$
+
+$\sigma_t$ is the standard deviation attached to every reconstructed value
+and is what the calibration diagnostics in §7 are computed on. The weights
+are trained by minimizing the negative log-likelihood of the observed
+residuals on the training part of the calibration period, on days with a
+retrieval only,
+
+$$
+\mathcal L=-\frac{1}{N}\sum_{t\,:\,a_t=1}\log p\!\left(\varepsilon_t\mid X_t\right),
+$$
+
+with the validation part used for early stopping alone. The number of
+components is chosen per patch by the Akaike information criterion on the
+training part, $\mathrm{AIC}=2k+2\,\mathcal L\,N$, searched upward from
+$M=2$ and stopped once the improvement falls below 5 %. The shipped patch
+uses $M=2$.
+
+### 2.4 Where each piece lives
+
+| Equation | Role | File |
+|---|---|---|
+| $\theta^{\mathrm{WBM}}$ update, loss function $L$ | physical baseline | `wbm_forwardSim.m` (`sub_loss`), documentation only; the baseline is shipped in channel 2 |
+| dry-down limbs, quantile fit | defines $L$ between $p_1$ and $p_2$ | `wbm_drydown.m`, `wbm_quantreg.m` |
+| $(\alpha,\ \Delta Z,\ \beta)$ per cell | fitted parameters of the shipped patch | `pretrained/wbm_params_patch20.mat` |
+| $X_t$ assembly and masking | four-channel input | `mdn_reconstruct.m` |
+| encoder – ConvLSTM – decoder – $3M$ head | network | `mdn_build_network.m`, `ConvLSTMLayer.m` |
+| $w_{m,t},\ \mu_{m,t},\ \sigma_{m,t}$ from the raw head; $\hat\varepsilon_t$, $\sigma_t$ | mixture head, total variance | `mdn_reconstruct.m` |
+| $\theta^{\mathrm{rec}}=\theta^{\mathrm{WBM}}-\hat\varepsilon$, fallback at zero | reconstruction rule | `mdn_reconstruct.m` |
+| KGE, RMSE, R, bias per cell | accuracy | `metrics.m` |
+| PICP, MPIW, $q$, CRPS, MA, SB | calibration of $\sigma_t$ | `uncertainty_metrics.m` |
+| $\mathcal L$, AIC, $M$ | training and model selection (not run here) | recorded in `pretrained/best_model_M2.mat` → `performance` |
+
+---
+
+## 3. What the pipeline does
 
 ```
 data/sample_patch.mat ── dequantize ──┐
@@ -73,7 +185,7 @@ flagged in their headers as off the run path.
 
 ---
 
-## 3. Repository layout
+## 4. Repository layout
 
 ```
 PGMN/
@@ -122,7 +234,7 @@ PGMN/
 
 ---
 
-## 4. System requirements
+## 5. System requirements
 
 ### Reference machine
 
@@ -151,7 +263,7 @@ axes. Run `checkSystemRequirements` to verify your environment.
 
 ---
 
-## 5. The shipped patch
+## 6. The shipped patch
 
 | | |
 |---|---|
@@ -187,7 +299,7 @@ only; *valid* decides when to stop; the evaluation block is touched by neither.
 
 ---
 
-## 6. Reproduced numbers
+## 7. Reproduced numbers
 
 **Every value is a median across the 2,536 scored cells, with the
 interquartile range in brackets.** One metric is computed per cell first, then
@@ -252,7 +364,7 @@ quantized at 1/n per cell in a way the continuous metrics are not.
 
 ---
 
-## 7. Regenerating the shipped files
+## 8. Regenerating the shipped files
 
 `data/sample_patch.mat` and both files in `pretrained/` were extracted from
 archives that are not part of this repository. A normal user does not need
@@ -261,11 +373,11 @@ this; the shipped files already reproduce everything above. The procedure is in
 
 ---
 
-## 8. Citation
+## 9. Citation
 
 See [`CITATION.cff`](CITATION.cff).
 
-## 9. License
+## 10. License
 
 MIT; see [`LICENSE`](LICENSE). The trained weights and the sample patch are
 released under the same terms.
