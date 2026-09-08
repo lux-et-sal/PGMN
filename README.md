@@ -55,7 +55,7 @@ time from precipitation $P$ (mm day⁻¹) alone:
 
 $$
 \theta^{\mathrm{WBM}}_{t+1}=\theta^{\mathrm{WBM}}_{t}
-+\Delta t\left(\frac{P_{t}}{\Delta Z}-L\!\left(\theta^{\mathrm{WBM}}_{t}\right)\right)
++\Delta t\left(\frac{P_{t}}{\Delta Z}-L\left(\theta^{\mathrm{WBM}}_{t}\right)\right)
 $$
 
 where $\Delta Z$ (mm) is the effective depth and $L(\theta)$ (day⁻¹) is a
