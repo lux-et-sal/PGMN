@@ -14,7 +14,7 @@ abstract: >
   MATLAB in under a minute.
 authors:
   - family-names: "Hong"
-    given-names: "Hae-Chan"
+    given-names: "Changmin"
     email: "hchm5465@gmail.com"
 version: "0.2.0"
 date-released: "2026-08-29"
