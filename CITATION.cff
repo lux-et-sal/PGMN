@@ -12,8 +12,8 @@ abstract: >-
   and every value carries a predictive standard deviation. The repository
   ships one 64 x 64 patch over the central United States with the trained
   model for that patch, so the evaluation-period accuracy and the calibration
-  diagnostics reported in the paper can be reproduced from MATLAB in under a
-  minute.
+  diagnostics of that patch can be reproduced from MATLAB in under a minute
+  and checked against the authors' production evaluation.
 authors:
   - family-names: "Hong"
     given-names: "Changmin"
