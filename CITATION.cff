@@ -1,30 +1,54 @@
 cff-version: 1.2.0
-message: "If you use PGMN in academic work, please cite the accompanying paper."
-title: "PGMN: Physics-Guided Mixture Density Network for SMAP soil moisture reconstruction"
-abstract: >
-  Reproducible MATLAB pipeline that pairs a Water Balance Model (WBM)
-  baseline with a mixture-density ConvLSTM residual learner to reconstruct
-  daily SMAP surface soil moisture on the EASE-Grid 2.0 Global M36 grid
-  (36 km, equal-area). The network predicts the distribution of the WBM
-  residual rather than soil moisture directly, so the reconstruction
-  inherits the water balance and carries a predictive uncertainty.
-  This repository ships one 64x64 patch over the central United States
-  together with the trained model, so that the evaluation-period accuracy
-  and calibration numbers reported in the paper can be reproduced from
-  MATLAB in under a minute.
+message: "If you use this software, please cite the accompanying paper (preferred-citation) and the repository."
+type: software
+title: "PGMN: Physics-Guided Mixture Density Network for temporally continuous reconstruction of satellite soil moisture"
+abstract: >-
+  MATLAB implementation and reproduction package for PGMN, a physics-guided
+  residual-learning framework that reconstructs temporally continuous SMAP
+  surface soil moisture on the EASE-Grid 2.0 Global 36 km grid. An open-loop
+  water balance model driven by precipitation alone provides the baseline, and
+  a mixture density ConvLSTM predicts the distribution of the baseline
+  residual; the reconstruction is the baseline minus the predicted residual,
+  and every value carries a predictive standard deviation. The repository
+  ships one 64 x 64 patch over the central United States with the trained
+  model for that patch, so the evaluation-period accuracy and the calibration
+  diagnostics reported in the paper can be reproduced from MATLAB in under a
+  minute.
 authors:
   - family-names: "Hong"
     given-names: "Changmin"
-    email: "hchm5465@gmail.com"
+    affiliation: "Kyung Hee University"
+    email: "hchm5465@khu.ac.kr"
+contact:
+  - family-names: "Kim"
+    given-names: "Seokhyeon"
+    affiliation: "Kyung Hee University"
+    email: shynkim@khu.ac.kr
 version: "0.2.0"
-date-released: "2026-08-29"
+date-released: "2026-09-08"
 license: MIT
+repository-code: "https://github.com/lux-et-sal/PGMN"
 keywords:
-  - soil moisture
   - SMAP
-  - water balance model
-  - mixture density network
-  - ConvLSTM
-  - physics-guided machine learning
-  - predictive uncertainty
-  - reproducibility
+  - satellite soil moisture
+  - physics-guided residual learning
+  - hybrid environmental modeling
+  - temporal reconstruction
+preferred-citation:
+  type: article
+  title: "PGMN: A Physics-Guided Mixture Density Network for Temporally Continuous Reconstruction of Satellite Soil Moisture"
+  authors:
+    - family-names: "Hong"
+      given-names: "Changmin"
+    - family-names: "Kim"
+      given-names: "Seokhyeon"
+    - family-names: "Sharma"
+      given-names: "Yaggesh Kumar"
+    - family-names: "Palagiri"
+      given-names: "Hussain"
+    - family-names: "Sharma"
+      given-names: "Ashish"
+  journal: "Environmental Modelling & Software"
+  status: submitted
+  year: 2026
+  notes: "Manuscript ENVSOFT-D-26-01254, revised version. Update with volume, pages and DOI on publication."
