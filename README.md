@@ -12,8 +12,11 @@ $$\theta^{\mathrm{rec}}_t=\theta^{\mathrm{WBM}}_t-\hat{\varepsilon}_t$$
 so the result inherits the water balance and arrives with a predictive spread
 rather than a bare number (§2). This repository ships **one 64×64 patch over the
 central United States** and the **trained model for that patch**, so the
-evaluation-period accuracy *and* the calibration diagnostics reported in the
-paper can be reproduced end-to-end in under a minute.
+evaluation-period accuracy *and* the calibration diagnostics can be reproduced
+end-to-end for that patch in under a minute, against the values the authors'
+production evaluation recorded for it. The paper's headline numbers are
+medians over all 83 patches (53,311 cells); one patch cannot reproduce those,
+and §7 puts the two side by side.
 
 > Scope: this is the inference and verification path only. Training the full
 > 83-patch global domain, and running the water balance model, are not part of
@@ -31,7 +34,7 @@ paper can be reproduced end-to-end in under a minute.
 >> runExample_quick            % reproduce  (~8 s CPU, ~7 s GPU)
 
 >> cd ../expected_outputs
->> verify_reproduction         % PASS / FAIL against the paper reference
+>> verify_reproduction         % PASS / FAIL against the production reference
 
 >> cd ../matlab
 >> plotReproduction            % the four-panel figure
@@ -83,7 +86,7 @@ $$
 $$
 
 Where the correction would drive $\theta^{\mathrm{rec}}_t$ to zero or below,
-the baseline value is kept instead (0.04 % of the cell-days in the paper).
+the baseline value is kept instead.
 
 The input at day $t$ is a four-channel field over the 64 × 64 patch
 
@@ -131,14 +134,15 @@ residuals on the training part of the calibration period, on days with a
 retrieval only:
 
 $$
-\mathcal{L}=-\frac{1}{N}\sum_{t: a_t=1}\log p\left(\varepsilon_t\mid X_t\right)
+\mathrm{NLL}=-\frac{1}{n}\sum_{t: a_t=1}\log\left[p\left(\varepsilon_t\mid X_t\right)\right]
 $$
 
-The validation part is used for early stopping alone. The number of
-components is chosen per patch by the Akaike information criterion on the
-training part, $\mathrm{AIC}=2k+2\mathcal{L}N$, searched upward from
-$\mathrm{M}=2$ and stopped once the improvement falls below 5 %. The shipped patch
-uses $\mathrm{M}=2$.
+where $n$ is the number of observed residuals in the training part. The
+validation part is used for early stopping alone. The number of components
+is chosen per patch by the Akaike information criterion on the training
+part, $\mathrm{AIC}=2k+2n\cdot\mathrm{NLL}$ with $k$ the number of trainable
+weights, searched upward from $\mathrm{M}=2$ and stopped once the improvement
+falls below 5 %. The shipped patch uses $\mathrm{M}=2$.
 
 ### 2.4 Where each piece lives
 
@@ -151,9 +155,9 @@ uses $\mathrm{M}=2$.
 | encoder – ConvLSTM – decoder – $3\mathrm{M}$ head | network | `mdn_build_network.m`, `ConvLSTMLayer.m` |
 | $w_{m,t}, \mu_{m,t}, \sigma_{m,t}$ from the raw head; $\hat\varepsilon_t$, $\sigma_t$ | mixture head, total variance | `mdn_reconstruct.m` |
 | $\theta^{\mathrm{rec}}=\theta^{\mathrm{WBM}}-\hat\varepsilon$, fallback at zero | reconstruction rule | `mdn_reconstruct.m` |
-| KGE, RMSE, R, bias per cell | accuracy | `metrics.m` |
+| Bias, ubRMSE, R, KGE per cell | accuracy (Table 5 of the paper) | `metrics.m` |
 | PICP, MPIW, $q$, CRPS, MA, SB | calibration of $\sigma_t$ | `uncertainty_metrics.m` |
-| $\mathcal{L}$, AIC, $\mathrm{M}$ | training and model selection (not run here) | recorded in `pretrained/best_model_M2.mat` → `performance` |
+| NLL, AIC, $\mathrm{M}$ | training and model selection (not run here) | recorded in `pretrained/best_model_M2.mat` → `performance` |
 
 ---
 
@@ -171,7 +175,7 @@ data/sample_patch.mat ── dequantize ──┐
                         ┌──────────────────────┴──────────────────────┐
                         ▼                                             ▼
                    metrics.m                              uncertainty_metrics.m
-              KGE RMSE R Bias, per cell                PICP MPIW q MAE CRPS MA SB
+              Bias ubRMSE R KGE, per cell               PICP MPIW q MAE CRPS MA SB
                         └──────────────────┬──────────────────────────┘
                                            ▼
                               outputs/metrics_latest.mat
@@ -305,6 +309,14 @@ only; *valid* decides when to stop; the evaluation block is touched by neither.
 
 ## 7. Reproduced numbers
 
+**These are the values for the shipped patch (patch 20, 2,536 scored cells),
+not the global values in the paper.** The paper's Table 5 and Section 3.3.1
+report medians over the whole reconstructed domain of 53,311 cells; the
+numbers below are what the same production evaluation recorded for this one
+patch, and they are what `verify_reproduction.m` checks against. The
+comparison at the end of this section shows how the patch sits relative to
+the global medians.
+
 **Every value is a median across the 2,536 scored cells, with the
 interquartile range in brackets.** One metric is computed per cell first, then
 summarized. Pooling all (cell, day) pairs into a single population would weight
@@ -315,10 +327,13 @@ needs no latitude weighting.
 
 ### Accuracy
 
-| | KGE | RMSE (m³ m⁻³) | R | Bias (m³ m⁻³) |
+| | Bias (m³ m⁻³) | ubRMSE (m³ m⁻³) | R | KGE |
 |---|---|---|---|---|
-| WBM baseline | 0.2826 [0.166, 0.395] | 0.0729 [0.053, 0.088] | 0.3441 [0.237, 0.457] | −0.0046 [−0.017, 0.015] |
-| **PGMN** | **0.6345** [0.557, 0.704] | **0.0462** [0.037, 0.055] | **0.6833** [0.618, 0.748] | **0.0017** [−0.007, 0.013] |
+| WBM baseline | −0.0046 [−0.017, 0.015] | 0.0692 [0.050, 0.083] | 0.3441 [0.237, 0.457] | 0.2826 [0.166, 0.395] |
+| **PGMN** | **0.0017** [−0.007, 0.013] | **0.0437** [0.036, 0.051] | **0.6833** [0.618, 0.748] | **0.6345** [0.557, 0.704] |
+
+The four metrics and their order follow Table 5 of the paper. ubRMSE is the
+RMSE after removing the bias, sqrt(RMSE² − Bias²), computed per cell.
 
 Per-cell improvement, median: **ΔKGE = +0.3363**.
 
@@ -343,10 +358,28 @@ are neither systematically too narrow nor too wide. **CRPS is compared against
 MAE** because CRPS collapses to MAE when the forecast is a point mass, so the
 reduction measures what issuing a distribution bought over issuing a number.
 
+### This patch against the paper
+
+| | Patch 20 (this package) | Paper, global (53,311 cells) |
+|---|---|---|
+| Bias, WBM → PGMN (m³ m⁻³) | −0.005 → +0.002 | −0.013 → −0.000 |
+| ubRMSE, WBM → PGMN (m³ m⁻³) | 0.069 → 0.044 | 0.045 → 0.033 |
+| R, WBM → PGMN | 0.344 → 0.683 | 0.484 → 0.766 |
+| KGE, WBM → PGMN | 0.283 → 0.635 | 0.316 → 0.679 |
+| PICP₉₅ | 0.943 | 0.947 |
+| q | 1.067 | 1.072 |
+| CRPS reduction vs MAE | 28.4 % | 27.7 % |
+
+Every row is the same definition on a different set of cells. The patch's
+baseline is weaker than the global median and its improvement is of the same
+size, and the calibration diagnostics sit within a few thousandths of the
+global values.
+
 ### Tolerances
 
 `verify_reproduction.m` checks 19 quantities: three domain counts, eight
-accuracy medians, and eight calibration medians. Tolerances are absolute and
+accuracy medians (Bias, ubRMSE, R, KGE for the baseline and for PGMN), and
+eight calibration medians. Tolerances are absolute and
 set from measured spread, not chosen for comfort: the package agrees with the
 production evaluation to 7.6 × 10⁻⁶ on GPU, and a CPU-only run moves the
 reported medians by at most 1.9 × 10⁻⁵. Most bounds sit 50–100× above that.
