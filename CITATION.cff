@@ -23,7 +23,7 @@ contact:
   - family-names: "Kim"
     given-names: "Seokhyeon"
     affiliation: "Kyung Hee University"
-    email: shynkim@khu.ac.kr
+    email: "shynkim@khu.ac.kr"
 version: "0.2.0"
 date-released: "2026-09-08"
 license: MIT
