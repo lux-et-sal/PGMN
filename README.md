@@ -54,8 +54,7 @@ Surface soil moisture $\theta$ (m³ m⁻³) in a cell is advanced one day at a
 time from precipitation $P$ (mm day⁻¹) alone:
 
 $$
-\theta^{\mathrm{WBM}}_{t+1}=\theta^{\mathrm{WBM}}_{t}
-+\Delta t\left(\frac{P_{t}}{\Delta Z}-L\left(\theta^{\mathrm{WBM}}_{t}\right)\right)
+\theta^{\mathrm{WBM}}_{t+1}=\theta^{\mathrm{WBM}}_{t}+\Delta t\left(\frac{P_{t}}{\Delta Z}-L\left(\theta^{\mathrm{WBM}}_{t}\right)\right)
 $$
 
 where $\Delta Z$ (mm) is the effective depth and $L(\theta)$ (day⁻¹) is a
@@ -63,7 +62,7 @@ loss rate. $L$ is piecewise: a linear ramp from the lower limit to $p_1$, a
 quantile regression on the observed dry-down limbs between $p_1$ and $p_2$
 (quantile $\beta$), and a linear extrapolation of slope $\alpha$ from $p_2$
 up to the porosity $\phi$, which bounds the state from above. The three
-parameters $(\alpha,\ \Delta Z,\ \beta)$ are fitted once per cell on the
+parameters $(\alpha, \Delta Z, \beta)$ are fitted once per cell on the
 calibration period only. After calibration the model runs **open loop**: it
 never reads a SMAP retrieval again, so the baseline is complete in time by
 construction and carries no observational noise. The run starts at the first
@@ -71,28 +70,28 @@ valid retrieval of each cell and is back-filled over the days before it.
 
 ### 2.2 Residual and reconstruction
 
-The learner never predicts soil moisture. It predicts the baseline error,
+The learner never predicts soil moisture. It predicts the baseline error
 
 $$
-\varepsilon_t=\theta^{\mathrm{WBM}}_t-\theta^{\mathrm{SMAP}}_t ,
+\varepsilon_t=\theta^{\mathrm{WBM}}_t-\theta^{\mathrm{SMAP}}_t
 $$
 
 and the reconstruction subtracts the predicted residual from the baseline:
 
 $$
-\theta^{\mathrm{rec}}_t=\theta^{\mathrm{WBM}}_t-\hat{\varepsilon}_t .
+\theta^{\mathrm{rec}}_t=\theta^{\mathrm{WBM}}_t-\hat{\varepsilon}_t
 $$
 
 Where the correction would drive $\theta^{\mathrm{rec}}_t$ to zero or below,
 the baseline value is kept instead (0.04 % of the cell-days in the paper).
 
-The input at day $t$ is a four-channel field over the 64 × 64 patch,
+The input at day $t$ is a four-channel field over the 64 × 64 patch
 
 $$
-X_t=\left[\,P_t,\ \theta^{\mathrm{WBM}}_t,\ \varepsilon_{t-1},\ a_{t-1}\,\right],
+X_t=\left[P_t, \theta^{\mathrm{WBM}}_t, \varepsilon_{t-1}, a_{t-1}\right]
 $$
 
-with $a_{t-1}\in\{0,1\}$ flagging whether a retrieval existed on the previous
+where $a_{t-1}\in\{0,1\}$ flags whether a retrieval existed on the previous
 day. When it did not, $\varepsilon_{t-1}$ is masked to zero on the normalized
 scale (the calibration mean) and $a_{t-1}=0$. The rule is the same in
 training and inference, so a gap of any length is handled by the same
@@ -105,39 +104,41 @@ block are warm-up and not scored.
 
 Residuals are heteroscedastic and not Gaussian, so the network outputs a
 distribution rather than a value. A convolutional encoder, a ConvLSTM core
-and a transposed-convolution decoder end in a $3M$-channel head that
+and a transposed-convolution decoder end in a $3\mathrm{M}$-channel head that
 parameterizes a Gaussian mixture at every cell:
 
 $$
-p\!\left(\varepsilon_t\mid X_t\right)=\sum_{m=1}^{M} w_{m,t}\,
-\mathcal N\!\left(\varepsilon_t\mid \mu_{m,t},\ \sigma_{m,t}^{2}\right),
-\qquad \sum_m w_{m,t}=1 .
+p\left(\varepsilon_t\mid X_t\right)=\sum_{m=1}^{\mathrm{M}} w_{m,t}\mathcal{N}\left(\varepsilon_t\mid \mu_{m,t}, \sigma_{m,t}^{2}\right)
 $$
+
+with $\sum_m w_{m,t}=1$.
 
 The point prediction is the conditional expectation, and the predictive
 spread follows from the law of total variance:
 
 $$
-\hat{\varepsilon}_t=\sum_{m} w_{m,t}\,\mu_{m,t},
-\qquad
-\sigma_t^{2}=\sum_{m} w_{m,t}\left[\sigma_{m,t}^{2}+\left(\mu_{m,t}-\hat{\varepsilon}_t\right)^{2}\right].
+\hat{\varepsilon}_t=\sum_{m} w_{m,t}\mu_{m,t}
+$$
+
+$$
+\sigma_t^{2}=\sum_{m} w_{m,t}\left[\sigma_{m,t}^{2}+\left(\mu_{m,t}-\hat{\varepsilon}_t\right)^{2}\right]
 $$
 
 $\sigma_t$ is the standard deviation attached to every reconstructed value
 and is what the calibration diagnostics in §7 are computed on. The weights
 are trained by minimizing the negative log-likelihood of the observed
 residuals on the training part of the calibration period, on days with a
-retrieval only,
+retrieval only:
 
 $$
-\mathcal L=-\frac{1}{N}\sum_{t\,:\,a_t=1}\log p\!\left(\varepsilon_t\mid X_t\right),
+\mathcal{L}=-\frac{1}{N}\sum_{t: a_t=1}\log p\left(\varepsilon_t\mid X_t\right)
 $$
 
-with the validation part used for early stopping alone. The number of
+The validation part is used for early stopping alone. The number of
 components is chosen per patch by the Akaike information criterion on the
-training part, $\mathrm{AIC}=2k+2\,\mathcal L\,N$, searched upward from
-$M=2$ and stopped once the improvement falls below 5 %. The shipped patch
-uses $M=2$.
+training part, $\mathrm{AIC}=2k+2\mathcal{L}N$, searched upward from
+$\mathrm{M}=2$ and stopped once the improvement falls below 5 %. The shipped patch
+uses $\mathrm{M}=2$.
 
 ### 2.4 Where each piece lives
 
@@ -145,14 +146,14 @@ uses $M=2$.
 |---|---|---|
 | $\theta^{\mathrm{WBM}}$ update, loss function $L$ | physical baseline | `wbm_forwardSim.m` (`sub_loss`), documentation only; the baseline is shipped in channel 2 |
 | dry-down limbs, quantile fit | defines $L$ between $p_1$ and $p_2$ | `wbm_drydown.m`, `wbm_quantreg.m` |
-| $(\alpha,\ \Delta Z,\ \beta)$ per cell | fitted parameters of the shipped patch | `pretrained/wbm_params_patch20.mat` |
+| $(\alpha, \Delta Z, \beta)$ per cell | fitted parameters of the shipped patch | `pretrained/wbm_params_patch20.mat` |
 | $X_t$ assembly and masking | four-channel input | `mdn_reconstruct.m` |
-| encoder – ConvLSTM – decoder – $3M$ head | network | `mdn_build_network.m`, `ConvLSTMLayer.m` |
-| $w_{m,t},\ \mu_{m,t},\ \sigma_{m,t}$ from the raw head; $\hat\varepsilon_t$, $\sigma_t$ | mixture head, total variance | `mdn_reconstruct.m` |
+| encoder – ConvLSTM – decoder – $3\mathrm{M}$ head | network | `mdn_build_network.m`, `ConvLSTMLayer.m` |
+| $w_{m,t}, \mu_{m,t}, \sigma_{m,t}$ from the raw head; $\hat\varepsilon_t$, $\sigma_t$ | mixture head, total variance | `mdn_reconstruct.m` |
 | $\theta^{\mathrm{rec}}=\theta^{\mathrm{WBM}}-\hat\varepsilon$, fallback at zero | reconstruction rule | `mdn_reconstruct.m` |
 | KGE, RMSE, R, bias per cell | accuracy | `metrics.m` |
 | PICP, MPIW, $q$, CRPS, MA, SB | calibration of $\sigma_t$ | `uncertainty_metrics.m` |
-| $\mathcal L$, AIC, $M$ | training and model selection (not run here) | recorded in `pretrained/best_model_M2.mat` → `performance` |
+| $\mathcal{L}$, AIC, $\mathrm{M}$ | training and model selection (not run here) | recorded in `pretrained/best_model_M2.mat` → `performance` |
 
 ---
 
@@ -227,9 +228,12 @@ PGMN/
 │   ├── wbm_forwardSim.m            │ read wbm_simulate.m's header before
 │   └── wbm_quantreg.m              ┘ assuming it replicates production.
 │
-└── expected_outputs/
-    ├── metrics_reference.json      ← paper reference values and tolerances
-    └── verify_reproduction.m       ← PASS/FAIL checker
+├── expected_outputs/
+│   ├── metrics_reference.json      ← paper reference values and tolerances
+│   └── verify_reproduction.m       ← PASS/FAIL checker
+│
+└── docs/
+    └── reproduction_figure.png     ← the figure in §7, from the reference run
 ```
 
 ---
@@ -351,7 +355,10 @@ quantized at 1/n per cell in a way the continuous metrics are not.
 
 ### The figure
 
-`plotReproduction.m` writes `outputs/reproduction_figure.png`:
+`plotReproduction.m` writes `outputs/reproduction_figure.png`. The copy below
+(`docs/reproduction_figure.png`) is the run used for the numbers above:
+
+![Reproduction figure: (a) Palestine 6 WNW time series, (b) per-cell delta KGE map, (c) reliability diagram, (d) reproduction margin](docs/reproduction_figure.png)
 
 - **(a)** soil moisture at the Palestine 6 WNW cell over the evaluation period:
   SMAP, WBM, PGMN with a ±1σ band;
