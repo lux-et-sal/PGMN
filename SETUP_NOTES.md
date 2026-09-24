@@ -78,8 +78,8 @@ to `<name>.bak_<timestamp>` first. Delete those backups once you are satisfied.
 | File | Size | Contents |
 |---|---|---|
 | `data/sample_patch.mat` | ~14 MB | `XVal` int32 [64 64 3 1004], `ResAvailVal` uint8, `YVal_Direct` int16, `MaskVal` logical, `scale_factor`, `fill_value`, `LAT`, `LON`, `land_mask`, `time`, `split`, `station`, `meta` |
-| `pretrained/best_model_M2.mat` | ~0.7 MB | `M`, `input_size`, `normParams`, `patch_info`, `save_method`, learnables and state tables plus values, trimmed `performance`, `train_info` |
-| `pretrained/wbm_params_patch20.mat` | ~40 KB | `alpha`, `Z`, `beta`, `modeling_mask`, per-cell WBM skill, `meta` |
+| `pretrained/best_model_M3.mat` | ~0.7 MB | `M`, `input_size`, `normParams`, `patch_info`, `save_method`, learnables and state tables plus values, trimmed `performance`, `train_info` |
+| `pretrained/wbm_params_patch21.mat` | ~47 KB | `alpha`, `Z`, `beta`, `modeling_mask`, per-cell WBM skill, `meta` |
 | `expected_outputs/metrics_reference.json` | ~3.6 KB | reference medians, IQRs, domain counts, tolerances |
 
 ## Two things worth knowing
