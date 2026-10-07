@@ -314,7 +314,7 @@ domain average.
 
 ### Periods
 
-| | Steps | Dates |
+| | Days | Dates |
 |---|---|---|
 | Calibration block | 2,831 | 2015-04-02 – 2022-12-31 |
 | ├─ train (fits weights) | 2,255 | |
