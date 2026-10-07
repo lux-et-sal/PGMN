@@ -19,7 +19,7 @@ medians over all 90 patches (55,124 cells); one patch cannot reproduce those,
 and §7 puts the two side by side.
 
 > Scope: this is the inference and verification path only. Training the full
-> 83-patch global domain, and running the water balance model, are not part of
+> 90-patch global domain, and running the water balance model, are not part of
 > this repository. See §3 for what that means in practice.
 
 ---
@@ -61,10 +61,14 @@ $$
 $$
 
 where $\Delta Z$ (mm) is the effective depth and $L(\theta)$ (day⁻¹) is a
-loss rate. $L$ is piecewise: a linear ramp from the lower limit to $p_1$, a
-quantile regression on the observed dry-down limbs between $p_1$ and $p_2$
-(quantile $\beta$), and a linear extrapolation of slope $\alpha$ from $p_2$
-up to the porosity $\phi$, which bounds the state from above. The three
+loss rate. $L$ is derived from the observed dry-down limbs by quantile
+regression (quantile $\beta$) over the observed range between
+$\theta_{\min}$ and $\theta_{\mathrm{up}}$, the minimum and maximum soil
+moisture of the dry-down record (`p1` and `p2` in the code), and is
+extrapolated linearly with slope $\alpha$ from $\theta_{\mathrm{up}}$
+toward the porosity $\phi$, which bounds the state from above. Below
+$\theta_{\min}$ the loss falls linearly to zero at the lower limit of the
+retrieval range. The three
 parameters $(\alpha, \Delta Z, \beta)$ are fitted once per cell on the
 calibration period only. After calibration the model runs **open loop**: it
 never reads a SMAP retrieval again, so the baseline is complete in time by
@@ -72,14 +76,14 @@ construction and carries no observational noise. The run starts at the first
 valid retrieval of each cell and is back-filled over the days before it.
 
 $P$ is MSWEP V2 daily precipitation (0.1 degree, area-weighted onto the same
-M36 grid). Its time index is deliberately not the raw MSWEP calendar day.
-SMAP's descending overpass reaches a given cell anywhere between 01 and 23
-UTC, while MSWEP accumulates over 00-24 UTC, so the window that separates two
-successive retrievals straddles two MSWEP days in a proportion that varies
-with longitude. The two products are therefore matched per cell from the SMAP
-scan time before the model is run: a cell observed before 12 UTC takes raw
-MSWEP day $t$, a cell observed at or after 12 UTC takes raw day $t+1$.
-`wbm_simulate.m` states the convention its `precip` argument expects.
+M36 grid), accumulated over 00:00-23:59 UTC. SMAP's descending overpass
+reaches a given cell anywhere between 01 and 23 UTC, so each retrieval is
+placed on the 00:00 UTC daily axis by its own overpass time: a retrieval
+observed before 12:00 UTC goes on that UTC day, and one observed later goes
+on the following day. The accumulation of day $t-1$, which ends at 23:59 UTC
+of day $t-1$, is then paired with the retrieval placed on day $t$.
+`wbm_simulate.m` states the same convention, in index form, for its `precip`
+argument.
 
 ### 2.2 Residual and reconstruction
 
@@ -111,10 +115,12 @@ which by that same equation falls after $t$ and cannot inform $\varepsilon_t$.
 
 where $a_{t-1}\in\{0,1\}$ flags whether a retrieval existed on the previous
 day. When it did not, $\varepsilon_{t-1}$ is masked to zero on the normalized
-scale (the calibration mean) and $a_{t-1}=0$. The rule is the same in
+scale (the mean residual of the training segment) and $a_{t-1}=0$. The rule is the same in
 training and inference, so a gap of any length is handled by the same
-forward pass: the residual channel stays masked and the model works from
-precipitation, the baseline and the flag alone. The network reads a window
+forward pass: the residual channel holds the constant, and the prediction
+rests on the residuals still left in the input window, the precipitation,
+the baseline and the spatial context of the convolutional encoder. Beyond the
+window only the precipitation, the baseline and the spatial context remain. The network reads a window
 of the last ten days, which is why the first nine days of the evaluation
 block are warm-up and not scored.
 
@@ -157,14 +163,14 @@ validation part is used for early stopping alone. The number of components
 is chosen per patch by the Akaike information criterion on the training
 part, $\mathrm{AIC}=2k+2n\cdot\mathrm{NLL}$ with $k$ the number of trainable
 weights, searched upward from $\mathrm{M}=2$ and stopped once the improvement
-falls below 5 %. The shipped patch uses $\mathrm{M}=2$.
+falls below 5 %. The shipped patch uses $\mathrm{M}=3$.
 
 ### 2.4 Where each piece lives
 
 | Equation | Role | File |
 |---|---|---|
 | $\theta^{\mathrm{WBM}}$ update, loss function $L$ | physical baseline | `wbm_forwardSim.m` (`sub_loss`), documentation only; the baseline is shipped in channel 2 |
-| dry-down limbs, quantile fit | defines $L$ between $p_1$ and $p_2$ | `wbm_drydown.m`, `wbm_quantreg.m` |
+| dry-down limbs, quantile fit | defines $L$ between $\theta_{\min}$ and $\theta_{\mathrm{up}}$ | `wbm_drydown.m`, `wbm_quantreg.m` |
 | $(\alpha, \Delta Z, \beta)$ per cell | fitted parameters of the shipped patch | `pretrained/wbm_params_patch21.mat` |
 | $X_t$ assembly and masking | four-channel input | `mdn_reconstruct.m` |
 | encoder – ConvLSTM – decoder – $3\mathrm{M}$ head | network | `mdn_build_network.m`, `ConvLSTMLayer.m` |
@@ -180,7 +186,7 @@ falls below 5 %. The shipped patch uses $\mathrm{M}=2$.
 
 ```
 data/sample_patch.mat ── dequantize ──┐
-  XVal   ch1 precip(t)                │
+  XVal   ch1 precip(t-1)              │
          ch2 WBM(t)   <- the physics  ├─► mdn_reconstruct ─► theta_PGMN, sigma
          ch3 residual(t-1)            │        ▲
   ResAvailVal ch4 obs flag(t-1) ──────┘        │
@@ -266,7 +272,7 @@ PGMN/
 | OS       | Windows Server 2022 Standard |
 | CPU      | Intel Xeon, ≥ 16 physical cores |
 | RAM      | 256 GB (`runExample_quick` peaks near 3 GB) |
-| GPU      | NVIDIA RTX A5000, 24 GB |
+| GPU      | NVIDIA RTX 5000 Ada Generation, 32 GB |
 | MATLAB   | R2025b |
 
 ### What is actually needed
@@ -301,7 +307,7 @@ axes. Run `checkSystemRequirements` to verify your environment.
 
 This patch runs from the Texas Gulf coast up through the Great Plains to the
 northern border. It was chosen because it contains **USCRN / Palestine 6 WNW**
-(31.78 °N, −95.72 °E), an ISMN station used in the paper's in-situ comparison,
+(31.78 °N, −95.72 °E), an ISMN station used in the paper's in situ comparison,
 and because it carries more scored cells than any other patch over the United
 States. Panel (a) of the figure shows that cell's own series rather than a
 domain average.
@@ -310,7 +316,7 @@ domain average.
 
 | | Steps | Dates |
 |---|---|---|
-| Calibration block | 2,830 | 2015-04-02 – 2022-12-31 |
+| Calibration block | 2,831 | 2015-04-02 – 2022-12-31 |
 | ├─ train (fits weights) | 2,255 | |
 | └─ valid (early stopping only) | 557 | |
 | Evaluation block | 1,004 | 2023-01-01 – 2025-09-30 |
@@ -379,15 +385,15 @@ reduction measures what issuing a distribution bought over issuing a number.
 |---|---|---|
 | Bias, WBM → PGMN (m³ m⁻³) | −0.004 → +0.000 | −0.006 → −0.000 |
 | ubRMSE, WBM → PGMN (m³ m⁻³) | 0.060 → 0.040 | 0.037 → 0.030 |
-| R, WBM → PGMN | 0.569 → 0.757 | 0.666 → 0.795 |
-| KGE, WBM → PGMN | 0.494 → 0.715 | 0.561 → 0.727 |
+| R, WBM → PGMN | 0.569 → 0.757 | 0.665 → 0.795 |
+| KGE, WBM → PGMN | 0.494 → 0.715 | 0.560 → 0.727 |
 | PICP₉₅ | 0.931 | 0.935 |
 | q | 1.098 | 1.114 |
 | CRPS reduction vs MAE | 28.4 % | 27.6 % |
 
 Every row is the same definition on a different set of cells. The patch's
-baseline is weaker than the global median (KGE 0.494 vs 0.561) and its KGE
-improvement is larger (+0.218 vs +0.166). The calibration diagnostics sit
+baseline is weaker than the global median (KGE 0.494 vs 0.560) and its KGE
+improvement is larger (+0.218 vs +0.145). The calibration diagnostics sit
 within 0.004 (PICP₉₅) and 0.016 (q) of the global values.
 
 ### Tolerances
