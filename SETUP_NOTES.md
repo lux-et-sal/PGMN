@@ -19,7 +19,7 @@ mechanical operation rather than a hunt through hard-coded constants.
   | EASE M36 grid | `inputs\grid_M36.mat` |
   | WBM global result | `outputs\WBM\Open-Loop_TO\WBM_Global_Results_QC.mat` |
   | Trained models | `outputs\MDN-ConvLSTM\outputs_individual_patches_QC_64x64_open_loop_TO_V1\Patch_<NNNN>\` |
-  | In-situ representatives | `outputs\ISMN_era5_R30\timeseries\representatives_2024.csv` |
+  | In situ representatives | `outputs\ISMN_era5_R30\timeseries\representatives_2024.csv` |
 
   Absolute paths are pre-filled in the `USER PATHS` block at the top of each
   script; edit them to match your machine.
@@ -66,7 +66,7 @@ re-run the whole sequence above. Everything else follows:
   so a patch with a different mixture size just produces a differently named
   file, and the run-time scripts glob for it too;
 - `make_reference` re-derives every reference value and the scored-cell count;
-- `plotReproduction` picks up the in-situ reference cell if the new patch
+- `plotReproduction` picks up the in situ reference cell if the new patch
   contains one, and falls back to the domain median if it does not.
 
 There is no version control on the source tree, so `trimBestModel` and
@@ -107,6 +107,4 @@ package generated would pass by construction. Accuracy is taken from
 evaluation code; ubRMSE, which the paper reports, is derived per cell from
 the stored RMSE and Bias (ubRMSE² = RMSE² − Bias²). Calibration is recomputed from that patch's
 `predictions.mat` with `uncertainty_metrics.m`, rather than read off the
-published global maps: 53 % of land cells belong to two or more patches, so
-inside any one patch's box those maps are blends of that patch and its
-neighbors, correct for a global map but wrong as a single-patch target.
+published global maps, which blend cells shared by overlapping patches.
