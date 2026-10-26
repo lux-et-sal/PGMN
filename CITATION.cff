@@ -37,7 +37,7 @@ keywords:
   - temporal reconstruction
 preferred-citation:
   type: article
-  title: "PGMN: A Physics-Guided Mixture Density Network for Temporally Continuous Reconstruction of Satellite Soil Moisture"
+  title: "What does a physical model add to machine-learning gap filling of satellite soil moisture?"
   authors:
     - family-names: "Hong"
       given-names: "Changmin"
